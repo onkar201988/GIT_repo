@@ -3,20 +3,22 @@
 #include <Servo.h>
 #include <ArduinoOTA.h>
 
+//-------------- String declairation--------------------------
 const char* ssid = "LakeViewWiFi";
 const char* password = "P@ssLakeView";
 const char* mqtt_server = "192.168.2.12";
 const char* mqtt_uname = "onkar20";
 const char* mqtt_pass = "onkar20";
 const char* mqtt_device_name = "ESP8266HallSwitch";
+const char* ota_device_name = "OTA_Hall_Switch";
+const char* ota_password = "onkar20";
 
+//-------------variable declaration
 #define servo 4
-
 long lastMsg = 0;
 char msg[50];
 int value = 0;
 const int lightPin = 2;
-
 const int posOn = 150;
 const int posOff = 45;
 const int posNormal = 100;
@@ -49,10 +51,10 @@ void setup_OTA() {
   ArduinoOTA.setPort(8266);
 
   // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname("OTA_Hall_Switch");
+  ArduinoOTA.setHostname(ota_device_name);
 
   // No authentication by default
-  ArduinoOTA.setPassword((const char *)"onkar20");
+  ArduinoOTA.setPassword((const char *)ota_password);
 
   ArduinoOTA.onStart([]() {
     Serial.println("Start");
@@ -73,7 +75,6 @@ void setup_OTA() {
   });
   ArduinoOTA.begin();
 }
-
 //----------------------------------------------------------------------------------------------------
 void setup_wifi() {
 
