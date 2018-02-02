@@ -1,12 +1,7 @@
-
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <Servo.h>
 #include <ArduinoOTA.h>
-
-#define servo 4
-
-// Update these with values suitable for your network.
 
 const char* ssid = "LakeViewWiFi";
 const char* password = "P@ssLakeView";
@@ -15,23 +10,25 @@ const char* mqtt_uname = "onkar20";
 const char* mqtt_pass = "onkar20";
 const char* mqtt_device_name = "ESP8266HallSwitch";
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+#define servo 4
 
 long lastMsg = 0;
 char msg[50];
 int value = 0;
 const int lightPin = 2;
 
-const int posOn = 135;
+const int posOn = 150;
 const int posOff = 45;
-const int posNormal = 90;
+const int posNormal = 100;
 const int switchPin = 0;
 int switchStatus = 0;
 
+WiFiClient espClient;
+PubSubClient client(espClient);
+
 Servo s1; //servo 1
 
-
+//----------------------------------------------------------------------------------
 void setup() {
   s1.attach(servo);
   s1.write(posOff);
@@ -124,9 +121,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
     switchStatus = 1;              //update local switch status with MQTT
     s1.attach(servo);
     s1.write(posOn);
-    delay(700);
+    delay(500);
     s1.write(posNormal);
-    delay(700);
+    delay(500);
     s1.detach();
     client.publish("home/hallSwitch/state", "1");
   }
@@ -139,9 +136,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
     switchStatus = 0;              //update local switch status with MQTT
     s1.attach(servo);
     s1.write(posOff);
-    delay(700);
+    delay(500);
     s1.write(posNormal);
-    delay(700);
+    delay(500);
     s1.detach();
     client.publish("home/hallSwitch/state", "0");
   }
