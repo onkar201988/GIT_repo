@@ -25,7 +25,7 @@ void setup_wifi() {
   Serial.println(ssid);
   
   WiFi.mode(WIFI_STA);
-  wifi_set_sleep_type(LIGHT_SLEEP_T);
+  wifi_set_sleep_type(LIGHT_SLEEP_T); 
   
   WiFi.begin(ssid, password);
 
@@ -42,8 +42,8 @@ void setup_wifi() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  delay(5000);
+  delay(15000);
   digitalWrite(LED_PIN, LOW);
-  delay(5000);
-  digitalWrite(LED_PIN, HIGH);
+  delay(15000);
+  digitalWrite(LED_PIN, HIGH);                                                                                                
 }
