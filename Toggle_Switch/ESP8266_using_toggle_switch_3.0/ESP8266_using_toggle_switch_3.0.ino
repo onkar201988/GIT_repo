@@ -43,9 +43,11 @@ void setup() {
   s1.detach();
   pinMode(lightPin, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
   pinMode(switchPin, INPUT);     // Initialize pin 0 as input
+  
   Serial.begin(115200);
   setup_wifi();
   setup_OTA();
+  
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
   digitalWrite(lightPin, LOW);

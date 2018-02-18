@@ -6,6 +6,9 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include <ArduinoOTA.h>
+extern "C" {
+  #include "user_interface.h"
+}
 
 //-------------- String declairation--------------------------
 const char* ssid = "LakeViewWiFi";
@@ -13,26 +16,31 @@ const char* password = "P@ssLakeView";
 const char* mqtt_server = "192.168.2.12";
 const char* mqtt_uname = "onkar20";
 const char* mqtt_pass = "onkar20";
-const char* mqtt_device_name = "ESP8266HallSwitch2";
-const char* ota_device_name = "OTA_Hall_Switch";
+const char* mqtt_device_name = "SensorModuleBedroom";
+const char* ota_device_name = "OTA_Sensor_module_bedroom";
 const char* ota_password = "onkar20";
 
 //-------------variable declaration--------------------------------
 WiFiClient espClient;
 PubSubClient client(espClient);
-#define DHTPIN    0
+#define DHTPIN    4
 #define LDRPIN    A0
-#define PIRPIN    4
+#define PIRPIN    5
 #define DHTTYPE           DHT11     // DHT 11 
 const int lightPin = 2;
 DHT dht(DHTPIN, DHTTYPE);
-
+int counter = 0;
+int lightIntensity = 0;
+int filterCycles = 5;
+int sleepTime = 1; // in minuts
 //-----------------------------------------------------------------
 void setup() {
   pinMode(LDRPIN, INPUT);
   pinMode(PIRPIN, INPUT);
   pinMode(DHTPIN, INPUT);
   pinMode(lightPin, OUTPUT); 
+
+  lightIntensity = analogRead(LDRPIN);
   
   Serial.begin(115200);
   setup_wifi();
@@ -79,7 +87,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("ESP8266Client",mqtt_uname,mqtt_pass)) {
+    if (client.connect(mqtt_device_name, mqtt_uname, mqtt_pass)) {
       Serial.println("connected");
       // Once connected, publish an announcement...
       client.publish("dev/out", "hello world");
@@ -95,7 +103,6 @@ void reconnect() {
 
 //----------------------------------------------------------------------------------------------------
 void setup_wifi() {
-
   delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
@@ -103,7 +110,7 @@ void setup_wifi() {
   Serial.println(ssid);
   //for Light sleep
   WiFi.mode(WIFI_STA);
-  wifi_set_sleep_type(LIGHT_SLEEP_T); 
+  wifi_set_sleep_type(LIGHT_SLEEP_T);
   
   WiFi.begin(ssid, password);
 
@@ -120,38 +127,54 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-//------------------------------------------------------------------------
-void loop() {
-  ArduinoOTA.handle();
-  if (!client.connected()) {
-    reconnect();
-  }
-
+void readTemperature()
+{
   float newTempValue = dht.readTemperature(true); //to use celsius remove the true text inside the parentheses  
   float newHumValue = dht.readHumidity();
 
-  Serial.print("Temperature: ");
-    Serial.print(newTempValue);
-    Serial.println(" *C");
-    client.publish("dev/temp", String(newTempValue).c_str());
-
-  Serial.print("Humidity: ");
-    Serial.print(newHumValue);
-    Serial.println("%");
-    client.publish("dev/humid", String(newHumValue).c_str());
-
-  int newLDR = analogRead(LDRPIN);
-
-  Serial.print("light intensity: ");
-    Serial.print(newLDR);
-
-  int pirValue = digitalRead(PIRPIN);
-
-  Serial.print("motion detected: ");
-    Serial.print(pirValue);
+  if(filterCycles == 1)
+  {
+    Serial.print("Temperature: ");
+      Serial.print(newTempValue);
+      Serial.println(" *F");
+      client.publish("home/bedroom/temperature", String(newTempValue).c_str());
   
-    
-  // Delay between measurements.
+    Serial.print("Humidity: ");
+      Serial.print(newHumValue);
+      Serial.println("%");
+      client.publish("home/bedroom/humidity", String(newHumValue).c_str());
+  }
+}
+
+void readLight(){
+  int newLDR = analogRead(LDRPIN);
+  lightIntensity = lightIntensity + 0.25*(newLDR - lightIntensity);
+ 
+  if(filterCycles == 1)
+  {
+    Serial.print("light intensity: ");                          
+    Serial.println(lightIntensity);
+    client.publish("home/bedroom/light", String(lightIntensity).c_str());
+  }
+}
+
+//------------------------------------------------------------------------
+void loop() {
+  ArduinoOTA.handle();
+  
+  if (!client.connected()) {
+    reconnect();
+  }
+  
+  readTemperature();
+  readLight();
+  filterCycles--;
+  
   delay(1000);
 
+  if(filterCycles == 0)
+  {
+    Serial.println("Going to sleep for 1 Min");
+    ESP.deepSleep(sleepTime*60*1000000, WAKE_RF_DEFAULT);
+  }
 }
