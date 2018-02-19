@@ -31,7 +31,6 @@ void setup() {
   digitalWrite(lightPin, LOW);
 }
 
-
 //----------------------------------------------------------------------------------------------------
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived new [");
@@ -44,38 +43,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '1') {
-
-    digitalWrite(lightPin, LOW);   // Blink the LED 2 times
-    delay(100);
-    digitalWrite(lightPin, HIGH);
-    delay(100);
-    digitalWrite(lightPin, LOW);
-    delay(100);
-    digitalWrite(lightPin, HIGH);
-
+    blinkLED(2);
     switchStatus = 1;              //update local switch status with MQTT
-    s1.attach(servo);
-    s1.write(posOn);
-    delay(500);
-    s1.write(posNormal);
-    delay(500);
-    s1.detach();
+    runServo(posOn);
     client.publish("home/hallSwitch/state", "1");
   }
   else {
+    blinkLED(1);
+    switchStatus = 0;              //update local switch status with MQTT
+    runServo(posOff);
+    client.publish("home/hallSwitch/state", "0");
+  }
+}
 
-    digitalWrite(lightPin, LOW);   // Blink the LED 1 times
+//---------------------------------------------------------------------------------------------------
+void runServo(int servoPos) {
+  s1.attach(servo);
+  s1.write(servoPos);
+  delay(500);
+  s1.write(posNormal);
+  delay(500);
+  s1.detach();
+}
+//---------------------------------------------------------------------------------------------------
+void blinkLED (int noOfTimes) {
+  for(int i=0; i< noOfTimes; i++) {
+    digitalWrite(lightPin, LOW);
     delay(100);
     digitalWrite(lightPin, HIGH);
-
-    switchStatus = 0;              //update local switch status with MQTT
-    s1.attach(servo);
-    s1.write(posOff);
-    delay(500);
-    s1.write(posNormal);
-    delay(500);
-    s1.detach();
-    client.publish("home/hallSwitch/state", "0");
+    delay(100);
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -114,12 +110,12 @@ void loop() {
     if (switchStatus)
     {
       client.publish("home/hallSwitch/state", "1");
-      digitalWrite(lightPin, LOW);        //incase of MQTT not working, toggle switch can be used
+      //digitalWrite(lightPin, LOW);        //incase of MQTT not working, toggle switch can be used
     }
     else
     {
       client.publish("home/hallSwitch/state", "0");
-      digitalWrite(lightPin, HIGH);
+      //digitalWrite(lightPin, HIGH);
     }
     delay(250);
   }
