@@ -32,7 +32,8 @@ DHT dht(DHTPIN, DHTTYPE);
 int counter = 0;
 int lightIntensity = 0;
 int filterCycles = 5;
-int sleepTime = 1; // in minuts
+int sleepTime = 5; // in minuts
+bool OTAReady = false;
 //-----------------------------------------------------------------
 void setup() {
   pinMode(LDRPIN, INPUT);
@@ -40,14 +41,17 @@ void setup() {
   pinMode(DHTPIN, INPUT);
   pinMode(lightPin, OUTPUT); 
 
-  lightIntensity = analogRead(LDRPIN);
+  //lightIntensity = analogRead(LDRPIN);
   
   Serial.begin(115200);
   setup_wifi();
   setup_OTA();
   
   client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
   digitalWrite(lightPin, LOW);
+
+  reconnect();
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -89,8 +93,7 @@ void reconnect() {
     // Attempt to connect
     if (client.connect(mqtt_device_name, mqtt_uname, mqtt_pass)) {
       Serial.println("connected");
-      // Once connected, publish an announcement...
-      client.publish("dev/out", "hello world");
+      client.subscribe("home/OTAReady/command");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -126,7 +129,7 @@ void setup_wifi() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 }
-
+//-----------------------------------------------------------------------
 void readTemperature()
 {
   float newTempValue = dht.readTemperature(true); //to use celsius remove the true text inside the parentheses  
@@ -145,31 +148,61 @@ void readTemperature()
       client.publish("home/bedroom/humidity", String(newHumValue).c_str());
   }
 }
-
+//------------------------------------------------------------------------
 void readLight(){
-  int newLDR = analogRead(LDRPIN);
-  lightIntensity = lightIntensity + 0.25*(newLDR - lightIntensity);
+  int newLDR = 1024 - analogRead(LDRPIN);
+  //newLDR = newLDR;
+  lightIntensity += newLDR;
  
   if(filterCycles == 1)
   {
-    Serial.print("light intensity: ");                          
+    Serial.print("light intensity: ");
+    lightIntensity = (lightIntensity * 100) / 1024; //convert it to %
     Serial.println(lightIntensity);
     client.publish("home/bedroom/light", String(lightIntensity).c_str());
+  }
+}
+//------------------------------------------------------------------------------
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived new [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  // Switch on the LED if an 1 was received as first character
+  if ((char)payload[0] == '1') {
+    client.publish("home/OTAReady/state", "1");
+    OTAReady = true;
+    filterCycles = 1;
+  }
+  else {
+    client.publish("home/OTAReady/state", "0");
+    OTAReady = false;
+    filterCycles = 5;
   }
 }
 
 //------------------------------------------------------------------------
 void loop() {
-  ArduinoOTA.handle();
-  
+
   if (!client.connected()) {
     reconnect();
   }
   
+  client.loop();
+  
+  if(OTAReady) {
+    ArduinoOTA.handle();
+  }
+  else {
+    filterCycles--;
+  }
+
   readTemperature();
   readLight();
-  filterCycles--;
-  
   delay(1000);
 
   if(filterCycles == 0)
