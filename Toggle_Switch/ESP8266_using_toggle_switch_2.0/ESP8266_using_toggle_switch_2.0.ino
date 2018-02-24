@@ -3,30 +3,16 @@
 #include <Servo.h>
 #include <ArduinoOTA.h>
 
-//-------------- String declairation--------------------------
-const char* ssid = "LakeViewWiFi";
-const char* password = "P@ssLakeView";
-const char* mqtt_server = "192.168.2.12";
-const char* mqtt_uname = "onkar20";
-const char* mqtt_pass = "onkar20";
-const char* mqtt_device_name = "ESP8266HallSwitch";
-const char* ota_device_name = "OTA_Hall_Switch";
-const char* ota_password = "onkar20";
+#include "user_data.h"
 
 //-------------variable declaration
-#define servo 4
 long lastMsg = 0;
 char msg[50];
 int value = 0;
-const int lightPin = 2;
 const int posOn = 150;
 const int posOff = 45;
 const int posNormal = 100;
-const int switchPin = 0;
 int switchStatus = 0;
-
-WiFiClient espClient;
-PubSubClient client(espClient);
 
 Servo s1; //servo 1
 
@@ -46,59 +32,6 @@ void setup() {
 }
 
 //----------------------------------------------------------------------------------------------------
-void setup_OTA() {
-  // Port defaults to 8266
-  ArduinoOTA.setPort(8266);
-
-  // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname(ota_device_name);
-
-  // No authentication by default
-  ArduinoOTA.setPassword((const char *)ota_password);
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
-}
-//----------------------------------------------------------------------------------------------------
-void setup_wifi() {
-
-  delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-    digitalWrite(lightPin, !digitalRead(lightPin));
-  }
-
-  digitalWrite(lightPin, HIGH);
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-}
-//----------------------------------------------------------------------------------------------------
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived new [");
   Serial.print(topic);
@@ -110,38 +43,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '1') {
-
-    digitalWrite(lightPin, LOW);   // Blink the LED 2 times
-    delay(100);
-    digitalWrite(lightPin, HIGH);
-    delay(100);
-    digitalWrite(lightPin, LOW);
-    delay(100);
-    digitalWrite(lightPin, HIGH);
-
+    blinkLED(2);
     switchStatus = 1;              //update local switch status with MQTT
-    s1.attach(servo);
-    s1.write(posOn);
-    delay(500);
-    s1.write(posNormal);
-    delay(500);
-    s1.detach();
+    runServo(posOn);
     client.publish("home/hallSwitch/state", "1");
   }
   else {
+    blinkLED(1);
+    switchStatus = 0;              //update local switch status with MQTT
+    runServo(posOff);
+    client.publish("home/hallSwitch/state", "0");
+  }
+}
 
-    digitalWrite(lightPin, LOW);   // Blink the LED 1 times
+//---------------------------------------------------------------------------------------------------
+void runServo(int servoPos) {
+  s1.attach(servo);
+  s1.write(servoPos);
+  delay(500);
+  s1.write(posNormal);
+  delay(500);
+  s1.detach();
+}
+//---------------------------------------------------------------------------------------------------
+void blinkLED (int noOfTimes) {
+  for(int i=0; i< noOfTimes; i++) {
+    digitalWrite(lightPin, LOW);
     delay(100);
     digitalWrite(lightPin, HIGH);
-
-    switchStatus = 0;              //update local switch status with MQTT
-    s1.attach(servo);
-    s1.write(posOff);
-    delay(500);
-    s1.write(posNormal);
-    delay(500);
-    s1.detach();
-    client.publish("home/hallSwitch/state", "0");
+    delay(100);
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -180,12 +110,12 @@ void loop() {
     if (switchStatus)
     {
       client.publish("home/hallSwitch/state", "1");
-      digitalWrite(lightPin, LOW);        //incase of MQTT not working, toggle switch can be used
+      //digitalWrite(lightPin, LOW);        //incase of MQTT not working, toggle switch can be used
     }
     else
     {
       client.publish("home/hallSwitch/state", "0");
-      digitalWrite(lightPin, HIGH);
+      //digitalWrite(lightPin, HIGH);
     }
     delay(250);
   }
