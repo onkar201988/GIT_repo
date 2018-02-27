@@ -10,10 +10,10 @@
 #define mqtt_server         "192.168.2.12"
 #define mqtt_uname          "onkar20"
 #define mqtt_pass           "onkar20"
-#define mqtt_device_name    "ESP8266HallSwitch"
-#define ota_device_name     "OTA_Hall_Switch"
-#define mqtt_topic_state    "home/hallSwitch/state"
-#define mqtt_topic_command  "home/hallSwitch/command"
+#define mqtt_device_name    "ESP8266DoorLock"
+#define ota_device_name     "OTA_Door_Lock"
+#define mqtt_topic_state    "home/doorLock/state"
+#define mqtt_topic_command  "home/doorLock/command"
 #define ota_password        "onkar20"
 
 #define servo             4

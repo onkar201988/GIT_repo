@@ -28,7 +28,7 @@ void setup() {
   setup_OTA();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-  digitalWrite(lightPin, LOW);
+  //digitalWrite(lightPin, HIGH);
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -61,8 +61,8 @@ void runServo(int servoPos) {
   s1.attach(servo);
   s1.write(servoPos);
   delay(500);
-  s1.write(posNormal);
-  delay(500);
+  //s1.write(posNormal);
+  //delay(500);
   s1.detach();
 }
 //---------------------------------------------------------------------------------------------------
@@ -107,13 +107,15 @@ void loop() {
     Serial.println("switch pressed");
     if (switchStatus)
     {
-      client.publish(mqtt_topic_state, "1");
       runServo(posOn);
+      client.publish(mqtt_topic_state, "1");
+      Serial.println("Door unlocked");
     }
     else
     {
-      client.publish(mqtt_topic_state, "0");
       runServo(posOff);
+      client.publish(mqtt_topic_state, "0");
+      Serial.println("Door locked");
     }
     delay(250);
   }
