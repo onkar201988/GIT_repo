@@ -22,7 +22,7 @@ void setup() {
    ArduinoOTA.setPort(8266);
 
   // Hostname defaults to esp8266-[ChipID]
-   ArduinoOTA.setHostname("ESP_target_1");
+   ArduinoOTA.setHostname("RGB Controller Hall");
 
   // No authentication by default
    ArduinoOTA.setPassword((const char *)"onkar20");

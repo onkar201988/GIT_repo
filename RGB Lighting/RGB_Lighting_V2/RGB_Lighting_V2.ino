@@ -28,6 +28,9 @@ const int lightPin = 2;
 int wait = 10;
 int pattern = 0;
 
+int timer = 0;
+bool changed = false;
+
 int redValueCurrent = 0;
 int greenValueCurrent = 0;
 int blueValueCurrent = 0;
@@ -156,7 +159,18 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (strcmp(topic,"home/RGB_Light/pattern")==0)
   {
-    pattern = (char)payload[0];
+    for (int i = 0; i < length; i++) {
+      Serial.print((char)payload[i]);
+    }
+    if ((char)payload[0] == '1'){
+      pattern = 1;
+    }
+    else if ((char)payload[0] == '2'){
+      pattern = 2;
+    }
+    else if ((char)payload[0] == '3'){
+      pattern = 3;
+    }
   }
 }
 
@@ -270,6 +284,8 @@ void crossFade(int red, int green, int blue) {
   redValueCurrent = redValueNext;
   greenValueCurrent = greenValueNext;
   blueValueCurrent = blueValueNext;
+
+  changed = false;
 }
 
 void setColorOutput(int redValue, int greenValue, int blueValue)
@@ -281,18 +297,33 @@ void setColorOutput(int redValue, int greenValue, int blueValue)
 //----------------------------------------------------------------------------------------------------
 void rainbowPattern()
 {
-  crossFade(512,0,0);   //red
-  delay(1000);
-  crossFade(512,512,0); //Yellow
-  delay(1000);
-  crossFade(0,512,0);   //Green
-  delay(1000);
-  crossFade(0,512,512); //Cyan
-  delay(1000);
-  crossFade(0,0,512);   //Blue
-  delay(1000);
-  crossFade(512,0,512); //Magenta
-  delay(1000);
+  if(timer <= 100 && !changed) {
+    crossFade(512,0,0);   //red
+    changed = true;
+  } 
+  else if(100 < timer && timer <= 200){
+    crossFade(512,512,0); //Yellow
+    changed = true;
+  }
+  else if(200 < timer && timer <= 300) {
+    crossFade(0,512,0);   //Green
+    changed = true;
+  }
+  else if(300 < timer && timer <= 400) {
+    crossFade(0,512,512); //Cyan
+    changed = true;
+  }
+  else if(400 < timer && timer <= 500) {
+    crossFade(0,0,512);   //Blue
+    changed = true;
+  }
+  else if(500 < timer && timer <= 600){
+    crossFade(512,0,512); //Magenta
+    changed = true;
+  }
+  else if(700 < timer) {
+    timer = 0;
+  }
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -343,7 +374,7 @@ void soothingPattern()
 //----------------------------------------------------------------------------------------------------
 void loop() {
   ArduinoOTA.handle();
-  
+    
   if (!client.connected()) {
     reconnect();
   }
@@ -352,10 +383,12 @@ void loop() {
   {
     switch(pattern){
       case 1:
+        Serial.println("rainbowPattern");
         rainbowPattern();
         break;
 
       case 2:
+        Serial.println("dance Pattern");
         dancePattern();
         break;
 
@@ -363,11 +396,12 @@ void loop() {
         soothingPattern();
         break;
 
-      //default:
-        //crossFade(0,0,0);
+      default:
+        crossFade(0,0,0);
     }
   }
   //updateLED();
-  //delay(10);
+  delay(10);
+  timer++;
   client.loop();
 }
