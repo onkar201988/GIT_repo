@@ -9,8 +9,10 @@
 long lastMsg = 0;
 char msg[50];
 int value = 0;
-const int posOn = 150;
-const int posOff = 45;
+//const int posOn = 200;
+//const int posOff = 0;
+const int posOn = 500;
+const int posOff = 2500;
 const int posNormal = 100;
 int switchStatus = 0;
 
@@ -59,7 +61,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //---------------------------------------------------------------------------------------------------
 void runServo(int servoPos) {
   s1.attach(servo);
-  s1.write(servoPos);
+  //s1.write(servoPos);
+  s1.writeMicroseconds(servoPos);
   delay(500);
   //s1.write(posNormal);
   //delay(500);
