@@ -179,11 +179,7 @@ void reconnect() {
 }
 //----------------------------------------------------------------------------------------------------
 void loop() {
-  if(ota_enable && ota_counter !=0)
-  {
-    ArduinoOTA.handle();
-    ota_enable = false;
-  }
+  ArduinoOTA.handle();
   
   if (!client.connected()) {
     reconnect();
