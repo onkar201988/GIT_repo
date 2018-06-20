@@ -94,6 +94,7 @@ void reconnect() {
     if (client.connect(mqtt_device_name, mqtt_uname, mqtt_pass)) {
       Serial.println("connected");
       client.subscribe("home/OTAReady/command");
+      client.subscribe("home/daylight");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -150,9 +151,9 @@ void readTemperature()
 }
 //------------------------------------------------------------------------
 void readLight(){
-  int newLDR = 1024 - analogRead(LDRPIN);
+  int newLDR = 1023 - analogRead(LDRPIN);
   //newLDR = newLDR;
-  lightIntensity += newLDR;
+  lightIntensity = newLDR;
  
   if(filterCycles == 1)
   {
@@ -167,21 +168,28 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived new [");
   Serial.print(topic);
   Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
 
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    client.publish("home/OTAReady/state", "1");
-    OTAReady = true;
-    filterCycles = 1;
+  if (strcmp(topic,"home/OTAReady/command")==0){
+    if ((char)payload[0] == '1') {
+      client.publish("home/OTAReady/state", "1");
+      OTAReady = true;
+      filterCycles = 1;
+    }
+    else {
+      client.publish("home/OTAReady/state", "0");
+      OTAReady = false;
+      filterCycles = 5;
+    }
   }
-  else {
-    client.publish("home/OTAReady/state", "0");
-    OTAReady = false;
-    filterCycles = 5;
+
+  if (strcmp(topic,"home/daylight")==0){
+    char* daylightString = (char*)payload;
+    if (strcmp(daylightString,"Day")==0){
+      sleepTime = 5;
+    }
+    else if (strcmp(daylightString,"Night")==0){
+      sleepTime = 15;
+    }
   }
 }
 

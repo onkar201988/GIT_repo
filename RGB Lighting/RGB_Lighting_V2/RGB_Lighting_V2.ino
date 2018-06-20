@@ -28,6 +28,7 @@ const int lightPin = 2;
 int wait = 10;
 int pattern = 0;
 
+
 int timer = 0;
 bool changed = false;
 
@@ -38,6 +39,11 @@ int blueValueCurrent = 0;
 int redValueNext = 0;
 int greenValueNext = 0;
 int blueValueNext = 0;
+
+int oldRed = 0;
+int oldGreen = 0;
+int oldBlue = 0;
+bool onceDone = false;
 
 String greenLedVal = "0";
 String redLedVal = "0";
@@ -119,7 +125,7 @@ void setup_wifi() {
     digitalWrite(lightPin, !digitalRead(lightPin));
   }
 
-  digitalWrite(lightPin, HIGH);
+  digitalWrite(lightPin, LOW);
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
@@ -155,6 +161,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
     //setColor(redLedVal.toInt()*10.24, greenLedVal.toInt()*10.24, blueLedVal.toInt()*10.24);
     crossFade(redLedVal.toInt()*5.12, greenLedVal.toInt()*5.12, blueLedVal.toInt()*5.12);
+
+    oldRed = redLedVal.toInt()*5.12;
+    oldGreen = greenLedVal.toInt()*5.12;
+    oldBlue = blueLedVal.toInt()*5.12;
   }
 
   if (strcmp(topic,"home/RGB_Light/pattern")==0)
@@ -162,7 +172,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     for (int i = 0; i < length; i++) {
       Serial.print((char)payload[i]);
     }
-    if ((char)payload[0] == '1'){
+    if ((char)payload[0] == '0'){
+      pattern = 0;
+    }
+    else if ((char)payload[0] == '1'){
       pattern = 1;
     }
     else if ((char)payload[0] == '2'){
@@ -297,79 +310,182 @@ void setColorOutput(int redValue, int greenValue, int blueValue)
 //----------------------------------------------------------------------------------------------------
 void rainbowPattern()
 {
-  if(timer <= 100 && !changed) {
+  if(timer < 100 && !changed) {
     crossFade(512,0,0);   //red
     changed = true;
-  } 
-  else if(100 < timer && timer <= 200){
+  }
+  else if(100 < timer && timer < 200 && !changed){
     crossFade(512,512,0); //Yellow
     changed = true;
   }
-  else if(200 < timer && timer <= 300) {
+  else if(200 < timer && timer < 300 && !changed) {
     crossFade(0,512,0);   //Green
     changed = true;
   }
-  else if(300 < timer && timer <= 400) {
+  else if(300 < timer && timer < 400 && !changed) {
     crossFade(0,512,512); //Cyan
     changed = true;
   }
-  else if(400 < timer && timer <= 500) {
+  else if(400 < timer && timer < 500 && !changed) {
     crossFade(0,0,512);   //Blue
     changed = true;
   }
-  else if(500 < timer && timer <= 600){
+  else if(500 < timer && timer < 600 && !changed){
     crossFade(512,0,512); //Magenta
     changed = true;
   }
   else if(700 < timer) {
     timer = 0;
+    changed = false;
+  }
+  else if(timer == 100 || timer == 200 || timer == 300 || timer == 400 || timer == 500 || timer == 600){
+    changed = false;
+  }
+  else {
+    return;
   }
 }
 
 //----------------------------------------------------------------------------------------------------
 void dancePattern()
 {
-  setColorOutput(512,0,0);
-  delay(100);
-  setColorOutput(512,512,0);
-  delay(100);
-  setColorOutput(0,512,0);
-  delay(100);
-  setColorOutput(0,512,512);
-  delay(100);
-  setColorOutput(0,0,512);
-  delay(100);
-  setColorOutput(512,0,512);
-  delay(100);
+  if(timer < 10 && !changed){
+    setColorOutput(512,0,0);
+    changed = true;
+  }
+  else if(10 < timer && timer < 20 && !changed){
+    setColorOutput(0,0,0);
+    changed = true;
+  }
+  else if(20 < timer && timer < 30 && !changed){
+    setColorOutput(512,512,0);
+    changed = true;
+  }
+  else if(30 < timer && timer < 40 && !changed){
+    setColorOutput(0,0,0);
+    changed = true;
+  }
+  else if(40 < timer && timer < 50 && !changed){
+    setColorOutput(0,512,0);
+    changed = true;
+  }
+  else if(60 < timer && timer < 70 && !changed){
+    setColorOutput(0,0,0);
+    changed = true;
+  }
+  else if(70 < timer && timer < 80 && !changed){
+    setColorOutput(0,512,512);
+    changed = true;
+  }
+  else if(90 < timer && timer < 100 && !changed){
+    setColorOutput(0,0,0);
+    changed = true;
+  }
+    else if(70 < timer && timer < 80 && !changed){
+    setColorOutput(0,0,512);
+    changed = true;
+  }
+  else if(90 < timer && timer < 100 && !changed){
+    setColorOutput(0,0,0);
+    changed = true;
+  }
+    else if(70 < timer && timer < 80 && !changed){
+    setColorOutput(512,0,512);
+    changed = true;
+  }
+  else if(90 < timer && timer < 100 && !changed){
+    setColorOutput(0,0,0);
+    changed = true;
+  }
+  else if(100 < timer){
+    changed = false;
+  }
+    else if(timer == 10 
+         || timer == 20 
+         || timer == 30 
+         || timer == 40 
+         || timer == 50 
+         || timer == 60
+         || timer == 70
+         || timer == 80
+         || timer == 90){
+    changed = false;
+  }
+  else {
+    return;
+  }
 }
 
 //----------------------------------------------------------------------------------------------------
 void soothingPattern()
 {
-  crossFade(512,0,0);   //red
-  delay(2000);
-  crossFade(0,0,0);     //black
-  delay(2000);
-  crossFade(512,512,0); //Yellow
-  delay(2000);
-  crossFade(0,0,0);     //black
-  delay(2000);
-  crossFade(0,512,0);   //Green
-  delay(2000);
-  crossFade(0,0,0);     //black
-  delay(2000);
-  crossFade(0,512,512); //Cyan
-  delay(2000);
-  crossFade(0,0,0);     //black
-  delay(2000);
-  crossFade(0,0,512);   //Blue
-  delay(2000);
-  crossFade(0,0,0);     //black
-  delay(2000);
-  crossFade(512,0,512); //Magenta
-  delay(2000);
-  crossFade(0,0,0);     //black
-  delay(2000);
+  if(timer < 200 && !changed) {
+    crossFade(512,0,0);   //red
+    changed = true;
+  }
+  else if(200 < timer && timer < 400 && !changed){
+    crossFade(0,0,0);     //black
+    changed = true;
+  }
+  else if(400 < timer && timer < 600 && !changed){
+    crossFade(512,512,0); //Yellow
+    changed = true;
+  }
+  else if(600 < timer && timer < 800 && !changed){
+    crossFade(0,0,0);     //black
+    changed = true;
+  }
+  else if(800 < timer && timer < 1000 && !changed){
+    crossFade(0,512,0);   //Green
+    changed = true;
+  }
+  else if(1000 < timer && timer < 1200 && !changed){
+    crossFade(0,0,0);     //black
+    changed = true;
+  }
+  else if(1200 < timer && timer < 1400 && !changed){
+    crossFade(0,512,512); //Cyan
+    changed = true;
+  }
+  else if(1400 < timer && timer < 1600 && !changed){
+    crossFade(0,0,0);     //black
+    changed = true;
+  }
+  else if(1600 < timer && timer < 1800 && !changed){
+    crossFade(0,0,512);   //Blue
+    changed = true;
+  }
+  else if(1800 < timer && timer < 2000 && !changed){
+    crossFade(0,0,0);     //black
+    changed = true;
+  }
+  else if(2000 < timer && timer < 2200 && !changed){
+    crossFade(512,0,512); //Magenta
+    changed = true;
+  }
+  else if(2200 < timer && timer < 2400 && !changed){
+    crossFade(0,0,0);     //black
+    changed = true;
+  }
+    else if(2400 < timer){
+    changed = false;
+  }
+    else if(timer == 200
+         || timer == 400
+         || timer == 600
+         || timer == 800
+         || timer == 1000
+         || timer == 1200
+         || timer == 1400
+         || timer == 1600
+         || timer == 1800
+         || timer == 2000
+         || timer == 2200){
+    changed = false;
+  }
+  else {
+    return;
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void loop() {
@@ -379,21 +495,29 @@ void loop() {
     reconnect();
   }
 
-  if(pattern != 0)
+  if(pattern < 5)
   {
     switch(pattern){
+      case 0:
+        if(!onceDone){
+          crossFade(oldRed, oldGreen, oldBlue);
+          onceDone = true;
+        }
+        break;
+        
       case 1:
-        Serial.println("rainbowPattern");
         rainbowPattern();
+        onceDone = false;
         break;
 
       case 2:
-        Serial.println("dance Pattern");
         dancePattern();
+        onceDone = false;
         break;
 
       case 3:
         soothingPattern();
+        onceDone = false;
         break;
 
       default:
