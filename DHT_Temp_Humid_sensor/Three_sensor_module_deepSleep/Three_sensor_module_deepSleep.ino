@@ -34,12 +34,14 @@ int lightIntensity = 0;
 int filterCycles = 5;
 int sleepTime = 5; // in minuts
 bool OTAReady = false;
+
+//ADC_MODE(ADC_VCC);
 //-----------------------------------------------------------------
 void setup() {
   pinMode(LDRPIN, INPUT);
   pinMode(PIRPIN, INPUT);
   pinMode(DHTPIN, INPUT);
-  pinMode(lightPin, OUTPUT); 
+  //pinMode(lightPin, OUTPUT); 
 
   //lightIntensity = analogRead(LDRPIN);
   
