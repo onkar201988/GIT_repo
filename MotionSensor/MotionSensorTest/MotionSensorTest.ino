@@ -1,10 +1,7 @@
-// DHT Temperature & Humidity Sensor
+//MotionSensorTest
 
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include <Adafruit_Sensor.h>
-#include <DHT.h>
-#include <DHT_U.h>
 #include <ArduinoOTA.h>
 extern "C" {
   #include "user_interface.h"
@@ -16,34 +13,40 @@ const char* password = "P@ssLakeView";
 const char* mqtt_server = "192.168.2.12";
 const char* mqtt_uname = "onkar20";
 const char* mqtt_pass = "onkar20";
-const char* mqtt_device_name = "SensorModuleBedroom";
-const char* ota_device_name = "OTA_Sensor_module_bedroom";
+const char* mqtt_device_name = "MotionSensorTest";
+const char* ota_device_name = "OTA_MotionSensorTest";
 const char* ota_password = "onkar20";
 
 //-------------variable declaration--------------------------------
 WiFiClient espClient;
 PubSubClient client(espClient);
-#define DHTPIN    4
+#define PIRPIN    10
 #define LDRPIN    A0
-#define PIRPIN    5
-#define DHTTYPE           DHT11     // DHT 11 
+#define RFPIN     5
 const int lightPin = 2;
-DHT dht(DHTPIN, DHTTYPE);
-int counter = 0;
 int lightIntensity = 0;
-//-----------------------------------------------------------------
+bool rfMotionDetected = false;
+bool pirMotionDetected = false;
+int counter = 2;
+
+//----------------------------------------------------------------------------------------------------
 void setup() {
   pinMode(LDRPIN, INPUT);
-  pinMode(PIRPIN, INPUT);
-  pinMode(DHTPIN, INPUT);
-  pinMode(lightPin, OUTPUT); 
+  
+  pinMode(PIRPIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIRPIN), PIRInterruptOn, RISING);
+  //attachInterrupt(digitalPinToInterrupt(PIRPIN), PIRInterruptOff, FALLING);
+  pinMode(RFPIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(RFPIN), RFInterruptOn, RISING);
+  //attachInterrupt(digitalPinToInterrupt(RFPIN), RFInterruptOff, FALLING);
+  
+  pinMode(lightPin, OUTPUT);
   
   Serial.begin(115200);
   setup_wifi();
   setup_OTA();
   
   client.setServer(mqtt_server, 1883);
-  digitalWrite(lightPin, LOW);
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -124,34 +127,58 @@ void setup_wifi() {
 }
 
 //----------------------------------------------------------------------------------------------------
-void readTemperature()
-{
-  float newTempValue = dht.readTemperature(true); //to use celsius remove the true text inside the parentheses  
-  float newHumValue = dht.readHumidity();
-
-  Serial.print("Temperature: ");
-    Serial.print(newTempValue);
-    Serial.println(" *F");
-    client.publish("home/bedroom/temperature", String(newTempValue).c_str());
-
-  Serial.print("Humidity: ");
-    Serial.print(newHumValue);
-    Serial.println("%");
-    client.publish("home/bedroom/humidity", String(newHumValue).c_str());
+void PIRInterruptOn () {
+  Serial.println("PIR motion detected");
+  counter = 2;
+  
+//  if(!pirMotionDetected){
+//    pirMotionDetected = true;
+//    client.publish("home/PIRTest", "1");
+//  }
 }
 
 //----------------------------------------------------------------------------------------------------
-void readLight(){
-  int newLDR = analogRead(LDRPIN);
+void PIRInterruptOff () {
+  Serial.println("PIR motion stopped");
+  counter = 2;
+  
+//  if(!pirMotionDetected){
+//    pirMotionDetected = true;
+//    client.publish("home/PIRTest", "1");
+//  }
+}
 
-  lightIntensity = lightIntensity + 0.25*(newLDR - lightIntensity);
+//----------------------------------------------------------------------------------------------------
+void RFInterruptOn () {
+  Serial.println("RF motion Detected");
+  counter = 2;
+  
+//  if(!rfMotionDetected){
+//    rfMotionDetected = true;
+//    client.publish("home/RFTest", "1");
+//  }
+}
+
+//----------------------------------------------------------------------------------------------------
+void RFInterruptOff () {
+  Serial.println("RF motion Stopped");
+  counter = 2;
+  
+//  if(!rfMotionDetected){
+//    rfMotionDetected = true;
+//    client.publish("home/RFTest", "1");
+//  }
+}
+//----------------------------------------------------------------------------------------------------
+void readLight(){
+  lightIntensity = analogRead(LDRPIN);
   
   Serial.print("light intensity: ");
   Serial.println(lightIntensity);
-  client.publish("home/bedroom/light", String(lightIntensity).c_str());
+  client.publish("home/Test/light", String(lightIntensity).c_str());
 }
-
-//------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------
+              
 void loop() {
   ArduinoOTA.handle();
   
@@ -159,22 +186,23 @@ void loop() {
     reconnect();
   }
 
-  //scheduler
-  counter++;
-  if(counter%10 == 0)
-  {
-    readTemperature();
-  }
+  readLight();
 
-  if(counter%1 == 0)
+  if(digitalRead(RFPIN) == 0)
   {
-    readLight();
+    Serial.println("RF motion Stopped");
   }
-
-  if(counter > 99)
-  {
-    counter = 0;
-  }
+//  if(counter == 0){
+//    if(rfMotionDetected){
+//      rfMotionDetected = false;
+//      client.publish("home/RFTest", "0");
+//    }
+//    if(pirMotionDetected){
+//      pirMotionDetected = false;
+//      client.publish("home/PIRTest", "0");
+//    }
+//  }
+  
+  counter--;
   delay(2000);
-
 }

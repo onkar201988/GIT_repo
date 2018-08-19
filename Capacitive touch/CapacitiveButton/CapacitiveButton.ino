@@ -14,8 +14,8 @@
 #define D9  3  // RX0 (Serial console)
 #define D10 1  // TX0 (Serial console)
 
-#define SEND D6
-#define RECEIVE D7
+#define SEND D0
+#define RECEIVE D5
 
 #define lightPin D4
 
@@ -26,6 +26,8 @@ void setup()
 {
   Serial.begin(115200);
   pinMode(lightPin, OUTPUT);
+
+  sensor.set_CS_Timeout_Millis(4000);
 }
 
 void loop()

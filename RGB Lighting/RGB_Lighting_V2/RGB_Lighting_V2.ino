@@ -17,7 +17,6 @@ const char* ota_device_name = "RGB_light";
 const char* ota_password = "onkar20";
 
 //-------------variable declaration
-#define serialEnable
 const int R = 12;
 const int G = 14;
 const int B = 4;
@@ -59,16 +58,13 @@ void setup() {
   pinMode(G, OUTPUT);
   pinMode(B, OUTPUT);
 
-  #ifdef serialEnable
-    Serial.begin(115200);
-  #endif
+  Serial.begin(115200);
   
   setup_wifi();
   setup_OTA();
   
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-  digitalWrite(lightPin, LOW);
   analogWrite(R, 0);
   analogWrite(G, 0);
   analogWrite(B, 0);
@@ -85,7 +81,6 @@ void setup_OTA() {
   // No authentication by default
   ArduinoOTA.setPassword((const char *)ota_password);
 
-  #ifdef serialEnable
     ArduinoOTA.onStart([]() {
       Serial.println("Start");
     });
@@ -103,7 +98,6 @@ void setup_OTA() {
       else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
       else if (error == OTA_END_ERROR) Serial.println("End Failed");
     });
-  #endif
   ArduinoOTA.begin();
 }
 //----------------------------------------------------------------------------------------------------
@@ -125,7 +119,8 @@ void setup_wifi() {
     digitalWrite(lightPin, !digitalRead(lightPin));
   }
 
-  digitalWrite(lightPin, LOW);
+  digitalWrite(lightPin, HIGH);
+  delay(100);
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
