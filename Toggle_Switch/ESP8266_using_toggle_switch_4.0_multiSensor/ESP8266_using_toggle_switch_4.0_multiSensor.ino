@@ -23,6 +23,7 @@ const char* ota_password      = "onkar20";
 //-------------variable declaration
 const int servo     = 4;
 const int lightPin  = 2;
+const int switchPin = 14;
 const int posOn     = 150;
 const int posOff    = 45;
 const int posNormal = 100;
@@ -33,8 +34,6 @@ int counter         = 0;
 const int DHTPIN    = 12;
 const int LDRPIN    = A0;
 const int RFPIN     = 5;
-const int capSend   = 16;
-const int capReceive= 14;
 bool  flag          = false;
 bool motionFlag     = false;
 #define DHTTYPE     DHT11     // DHT 11
@@ -42,7 +41,7 @@ bool motionFlag     = false;
 WiFiClient espClient;
 PubSubClient client(espClient);
 DHT dht(DHTPIN, DHTTYPE);
-Servo s1; //servo 1
+Servo s1;
 //CapacitiveSensor capSensor = CapacitiveSensor(capSend, capReceive);
 
 //----------------------------------------------------------------------------------
@@ -50,10 +49,12 @@ void setup() {
   s1.attach(servo);
   s1.write(posOff);
   s1.detach();
+  dht.begin();
   pinMode(lightPin, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
-  pinMode(LDRPIN, INPUT);
-  pinMode(RFPIN, INPUT);
-  pinMode(DHTPIN, INPUT);
+  pinMode(switchPin, INPUT);
+  pinMode(LDRPIN,   INPUT);
+  pinMode(RFPIN,    INPUT);
+  pinMode(DHTPIN,   INPUT);
   
   Serial.begin(115200);
   setup_wifi();
@@ -203,13 +204,35 @@ void readTemperature()
 void readLight(){
   int newLDR = analogRead(LDRPIN);
 
-  lightIntensity = lightIntensity + 0.25*(newLDR - lightIntensity);
-  
+  //lightIntensity = lightIntensity + 0.25*(newLDR - lightIntensity);
   Serial.print("light intensity: ");
-  Serial.println(lightIntensity);
-  client.publish("home/kitchen/light", String(lightIntensity).c_str());
+  //Serial.println(lightIntensity);
+  //client.publish("home/kitchen/light", String(lightIntensity).c_str());
+  Serial.println(newLDR);
+  client.publish("home/kitchen/light", String(newLDR).c_str());
 }
 
+//----------------------------------------------------------------------------------------------------
+void checkMotion(){
+  if(digitalRead(RFPIN))
+  {
+    if(motionFlag == false)
+    {
+      Serial.println("motion detected");
+      motionFlag = true;
+      client.publish("home/kitchen/rfmotion", "1");
+    }
+  }
+  else
+  {
+    if(motionFlag == true)
+    {
+      Serial.println("no motion");
+      motionFlag = false;
+      client.publish("home/kitchen/rfmotion", "0");
+    }
+  }
+}
 //----------------------------------------------------------------------------------------------------
 void loop() {
   ArduinoOTA.handle();
@@ -220,12 +243,12 @@ void loop() {
   
   //scheduler
   counter++;
-  if(counter%20 == 0)
+  if(counter%40 == 0)
   {
     readTemperature();
   }
 
-  if(counter%15 == 0)
+  if(counter%10 == 0)
   {
     readLight();
   }
@@ -235,25 +258,26 @@ void loop() {
     counter = 0;
   }
 
-  if(digitalRead(RFPIN))
+  if (0 == digitalRead(switchPin))
   {
-    if(motionFlag == false)
+    switchStatus = !switchStatus;
+    Serial.println("switch pressed");
+    if (switchStatus)
     {
-      Serial.println("motion detected");
-      motionFlag = true;
+      blinkLED(2);
+      client.publish("home/kitchenSwitch/state", "1");
+      runServo(posOn);
+    }
+    else
+    {
+      blinkLED(1);
+      client.publish("home/kitchenSwitch/state", "0");
+      runServo(posOff);
     }
   }
-  else
-  {
-    if(motionFlag == true)
-    {
-      Serial.println("no motion");
-      motionFlag = false;
-    }
-  }
-  //long total = capSensor.capacitiveSensor(30);
-  //Serial.print(total);
   
-  delay(1000);
+  checkMotion();
+  
+  delay(500);
   client.loop();
 }
