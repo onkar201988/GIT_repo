@@ -1,67 +1,34 @@
 #include <ESP8266WiFi.h>
-#include <ArduinoOTA.h>
 #include <PubSubClient.h>
 extern "C" {
   #include "user_interface.h"
 }
 
 //----------------------------------------------------------------------------------------------------
-const char* ssid = "LakeViewWiFi";
-const char* password = "P@ssLakeView";
-const char* mqtt_server = "192.168.2.12";
-const char* mqtt_uname = "onkar20";
-const char* mqtt_pass = "onkar20";
-const char* mqtt_device_name = "ESP8266WindowOne";
+const char* ssid              = "LakeViewWiFi";
+const char* password          = "P@ssLakeView";
+const char* mqtt_server       = "192.168.2.12";
+const char* mqtt_uname        = "onkar20";
+const char* mqtt_pass         = "onkar20";
+const char* mqtt_device_name  = "ESP8266WindowOne";
 
-const int lightPin = 2;
-const int enablePin = 4;
-int enableCount = 0;
+const int ESP_dataPin         = 12;
+const int ESP_feedbackPin     = 14;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 //----------------------------------------------------------------------------------------------------
 void setup() {
-  pinMode(enablePin, OUTPUT);
+  pinMode(ESP_feedbackPin, OUTPUT);
   digitalWrite(enablePin, HIGH);
-  pinMode(lightPin, OUTPUT);
+  pinMode(ESP_dataPin, INPUT);
   
   Serial.begin(115200);
   setup_wifi();
-  setup_OTA();
 
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-}
-//----------------------------------------------------------------------------------------------------
-void setup_OTA(){
-  // Port defaults to 8266
-  ArduinoOTA.setPort(8266);
-
-  // Hostname defaults to esp8266-[ChipID]
-   ArduinoOTA.setHostname("OTATestDevice");
-                                         
-  // No authentication by default
-   ArduinoOTA.setPassword((const char *)"onkar20");
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -132,18 +99,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 //----------------------------------------------------------------------------------------------------
 void loop() {
-  ArduinoOTA.handle();
-
   if (!client.connected()) {
     reconnect();
   }
   client.loop();
   
   delay(500);
-  enableCount++;
-  if(enableCount > 15)
-  {
-      Serial.println("Going to sleep for 1 Min");
-      ESP.deepSleep(1*60*1000000, WAKE_RF_DEFAULT);
-  }
+
 }
