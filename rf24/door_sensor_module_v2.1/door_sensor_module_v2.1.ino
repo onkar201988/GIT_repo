@@ -26,7 +26,7 @@ const float VccMax   = 3.2;                 // Maximum expected Vcc level, in Vo
 const float VccCorrection = 1.0/1.0;        // Measured Vcc by multimeter divided by reported Vcc
 
 bool doorStatus = false;                    // Door sensor value global
-const int sleepDuration = 2;                // Sleep duration to report battery (8 Sec x number of times)(180 for a day)
+const int sleepDuration = 4;                // Sleep duration to report battery (8 Sec x number of times)(180 for a day)
 int sleepCounter = 0;                       // Counter to keep sleep count
 
 volatile bool disableAlarm = false;         // Flag to disable the alarm (don't send the data)
@@ -111,8 +111,15 @@ void hallSwitch_ISR()
   if(disableAlarm == false) // only update the status when alarm is allowed
   {
     send_payload[DOORSTATUS]  = doorStatus ? 'O':'C';
-    //send_payload[BATTERY]     = (char) vcc.Read_Perc(VccMin, VccMax);
     sendData();
+  }
+  else
+  {
+    if(doorStatus == HIGH)      // if door is opened during alarm disable, then eneble alarm
+    {
+      disableAlarm = false;     // eneble alarm, so that when door is closed, the data will be sent
+      alarmDisableCounter = 0;  // reset disable counter
+    }
   }
   //sleepCounter = 0;       // Need to decide what to do with this
 }
@@ -133,7 +140,7 @@ void buttonSwitch_ISR()
   {
     buttonHighTime = millis();
     
-    if( (buttonHighTime - buttonLowTime) > 50 && (buttonHighTime - buttonLowTime) < 800)
+    if( (buttonHighTime - buttonLowTime) > 30 && (buttonHighTime - buttonLowTime) < 800)
     {
       buttonStateShort = HIGH;
       buttonState = LOW;
@@ -229,17 +236,30 @@ void loop()
   // If Button is pressed for short duration, then show battery life
   if(buttonStateShort == HIGH)
   {
-    showBattery();
+    #ifdef debug
+      Serial.println("Short press detected...");
+    #endif
+    //showBattery();
+    blinkLED(0, 100, 0, 1000);
+    buttonStateShort = LOW;
   }
   // If button is pressed for long duraion, then disable alarm (don't send data)
   else if(buttonStateLong == HIGH)
   {
+    #ifdef debug
+      Serial.println("Long press detected...");
+    #endif
+    blinkLED(0, 0, 100, 1000);
     disableAlarm = true;
     alarmDisableCounter = 2;    // Wait for 2x8=16 sec
+    buttonStateLong = LOW;
   }
-  else
+  else if(buttonState == LOW)
   { // If switch is not pressed, then only continue sleeping
-    if(sleepCounter > sleepDuration)
+    #ifdef debug
+      Serial.println("No button press, going to sleep for another day..");
+    #endif
+    if((sleepCounter > sleepDuration) && disableAlarm == false )
     {
       send_payload[BATTERY] = (char) vcc.Read_Perc(VccMin, VccMax);
       sendData();
