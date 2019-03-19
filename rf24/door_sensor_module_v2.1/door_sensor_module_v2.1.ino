@@ -15,7 +15,7 @@ const uint8_t rFChan = 89;                  // Set channel frequency default (ch
 const uint8_t rDelay = 7;                   // this is based on 250us increments, 0 is 250us so 7 is 2 ms
 const uint8_t rNum = 5;                     // number of retries that will be attempted
 
-const int hallSensor = 2;                   // Pin number where hall sensor is connected
+const int hallSensor_pin = 2;               // Pin number where hall sensor is connected
 const int button_pin = 3;                   // switch connected pin
 const int redLED_pin = 4;
 const int greenLED_pin = 5;
@@ -29,10 +29,15 @@ bool doorStatus = false;                    // Door sensor value global
 const int sleepDuration = 2;                // Sleep duration to report battery (8 Sec x number of times)(180 for a day)
 int sleepCounter = 0;                       // Counter to keep sleep count
 
-const unsigned long maxSwitchTime = 2000;   // Max time untill long swicth pressed
-bool disableAlarm = false;
-int alarmDisableCounter = 0;                // This counter is used in wdt isr to detect if waking up after a day 
+volatile bool disableAlarm = false;         // Flag to disable the alarm (don't send the data)
+volatile int alarmDisableCounter = 0;       // This counter is used in wdt isr to detect if waking up after a day 
                                             // or waking up after switch press to disable alarm
+
+volatile byte buttonState = LOW;            // Internal button state
+volatile byte buttonStateShort = LOW;       // Final button state for short press
+volatile byte buttonStateLong = LOW;        // Final button state for long press
+volatile unsigned long buttonHighTime;      // Internal time variable to store start of high time
+volatile unsigned long buttonLowTime;       // Internal time varible to store start of low time
 //----------------------------------------------------------------------------------------------------
 const int SENSORTYPE  = 0;
 const int DOORNUMBER  = 1;
@@ -46,7 +51,6 @@ const int PAYLOAD_LENGTH = 7;
 
 char send_payload[PAYLOAD_LENGTH];
 
-//----------------------------------------------------------------------------------------------------
 Vcc vcc(VccCorrection);                     // create VCC object
 
 //----------------------------------------------------------------------------------------------------
@@ -63,11 +67,12 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  pinMode(hallSensor, INPUT);
+  pinMode(hallSensor_pin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(hallSensor_pin), hallSwitch_ISR, CHANGE);
 
   pinMode(button_pin, INPUT);
   digitalWrite(button_pin, HIGH);
-  attachInterrupt(1, pin3_ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(button_pin), buttonSwitch_ISR, CHANGE);
   
   pinMode(redLED_pin, OUTPUT);
   pinMode(greenLED_pin, OUTPUT);
@@ -77,42 +82,27 @@ void setup() {
   wirelessSPI.begin();                      //Start the nRF24 module
   wirelessSPI.setPALevel(RF24_PA_LOW);      //Set low power for RF24
   wirelessSPI.setChannel(rFChan);           //set communication frequency channel
-  
   wirelessSPI.setRetries(rDelay,rNum);      //if a transmit fails to reach receiver (no ack packet) then this sets retry attempts and delay between retries   
   wirelessSPI.openWritingPipe(wAddress);    //open writing or transmit pipe
   wirelessSPI.stopListening();              //go into transmit mode
 
   #ifdef debug
-    Serial.begin(115200);                     //serial port to display received data
+    Serial.begin(115200);                   //serial port to display received data
     Serial.println("Door sensor is online...");
   #endif
   
-  pin2_ISR();                               // At start, read sensor data, and send to server
-  setInturrupt();                           // Set interrupt
+  hallSwitch_ISR();                         // At start, read sensor data, and send to server
 }
 
 //----------------------------------------------------------------------------------------------------
-void blinkLED(int red, int green, int blue, int duration)
-{
-  analogWrite(redLED_pin, red);
-  analogWrite(greenLED_pin, green);
-  analogWrite(blueLED_pin, blue);
-
-  delay(duration); // Blink LEDs
-
-  analogWrite(redLED_pin, 0);
-  analogWrite(greenLED_pin, 0);
-  analogWrite(blueLED_pin, 0);
-}
-//----------------------------------------------------------------------------------------------------
-void pin2_ISR()
+void hallSwitch_ISR()
 {
   delay(50);
   #ifdef debug
     Serial.println("In Reed switch ISR");
   #endif
   
-  doorStatus = digitalRead(hallSensor);
+  doorStatus = digitalRead(hallSensor_pin);
   
   #ifdef debug
     Serial.println(doorStatus);
@@ -124,50 +114,36 @@ void pin2_ISR()
     //send_payload[BATTERY]     = (char) vcc.Read_Perc(VccMin, VccMax);
     sendData();
   }
-  setInturrupt();
   //sleepCounter = 0;       // Need to decide what to do with this
 }
 
 //----------------------------------------------------------------------------------------------------
-void pin3_ISR()
+void buttonSwitch_ISR()
 {
-  delay(50);
   #ifdef debug
     Serial.println("In button switch ISR");
   #endif
-  
-  unsigned long beginTime;
-  unsigned long endTime;
-  bool isLongPressed = false;
-  beginTime = millis();
-  
-  while(digitalRead(button_pin) == false)       // Blocking long press logic
-  {
-    if((millis()- beginTime) > maxSwitchTime)   // check if the button is still pressed for more than 2 sec
-    {
-      isLongPressed = true;                     //Long press logic
-      disableAlarm = true;
-      alarmDisableCounter = 2;
-    }
-    delay(50);
-  }
 
-  if(isLongPressed == false)                    // if swicth was released before 2 sec
-  {                                             // short press logic, show battery level
-    if(send_payload[BATTERY] >= 65)
+  if(digitalRead(button_pin) == LOW)
+  {
+    buttonLowTime = millis();
+    buttonState = HIGH;
+  }
+  if( (digitalRead(button_pin) == HIGH) && (buttonState == HIGH) )
+  {
+    buttonHighTime = millis();
+    
+    if( (buttonHighTime - buttonLowTime) > 50 && (buttonHighTime - buttonLowTime) < 800)
     {
-      blinkLED(0, 100, 0, 1000); // Show LED Green
+      buttonStateShort = HIGH;
+      buttonState = LOW;
     }
-    else if( (send_payload[BATTERY] < 65) && (send_payload[BATTERY] >= 25))
+    else if ( (buttonHighTime - buttonLowTime) >= 800  && (buttonHighTime - buttonLowTime) < 4000)
     {
-      blinkLED(70, 70, 0, 1000); // Show LED Yellow
-    }
-    else if(send_payload[BATTERY] < 25)
-    {
-      blinkLED(100, 0, 0, 1000); // Show LED RED
+      buttonStateLong = HIGH;
+      buttonState = LOW;
     }
   }
-  // Done, return to loop
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -193,57 +169,87 @@ ISR(WDT_vect)
     // do nothing, return immediately
   }
 }
+
 //----------------------------------------------------------------------------------------------------
-void setInturrupt()
-{  
-  //Setup interrupt based on current switch status
-  if(HIGH == doorStatus)
+void blinkLED(int red, int green, int blue, int duration)
+{
+  analogWrite(redLED_pin, red);
+  analogWrite(greenLED_pin, green);
+  analogWrite(blueLED_pin, blue);
+
+  delay(duration); // Blink LEDs
+
+  analogWrite(redLED_pin, 0);
+  analogWrite(greenLED_pin, 0);
+  analogWrite(blueLED_pin, 0);
+}
+
+//----------------------------------------------------------------------------------------------------
+void showBattery()
+{
+  if(send_payload[BATTERY] >= 65)
   {
-    delay(100);
-    // Allow wake up pin to trigger interrupt on low.
-    attachInterrupt(0, pin2_ISR, FALLING);
+    blinkLED(0, 100, 0, 1000); // Show LED Green
   }
-  else
+  else if( (send_payload[BATTERY] < 65) && (send_payload[BATTERY] >= 25))
   {
-    delay(100);
-    // Allow wake up pin to trigger interrupt on high.
-    attachInterrupt(0, pin2_ISR, RISING);
+    blinkLED(70, 70, 0, 1000); // Show LED Yellow
+  }
+  else if(send_payload[BATTERY] < 25)
+  {
+    blinkLED(100, 0, 0, 1000); // Show LED RED
   }
 }
 
 //----------------------------------------------------------------------------------------------------
 void sendData()
 {
-  //wirelessSPI.powerUp();
-    delay(50);
-    if (!wirelessSPI.write(send_payload, PAYLOAD_LENGTH))
-    #ifdef debug
-      {  //send data and remember it will retry if it fails
-        Serial.println("Sending failed, check network");
-      }
-      else
-      {
-        Serial.println("Sending successful, data sent");
-      }
-    #else
-      {
-      }
-    #endif
-    
-    //wirelessSPI.powerDown();
+  wirelessSPI.powerUp();
+  delay(50);
+  if (!wirelessSPI.write(send_payload, PAYLOAD_LENGTH))
+  #ifdef debug
+    {  //send data and remember it will retry if it fails
+      Serial.println("Sending failed, check network");
+    }
+    else
+    {
+      Serial.println("Sending successful, data sent");
+    }
+  #else
+    {
+    }
+  #endif
+
+  wirelessSPI.powerDown();
 }
+
 //----------------------------------------------------------------------------------------------------
-void loop() {
-  if(sleepCounter > sleepDuration)
+void loop()
+{
+  // If Button is pressed for short duration, then show battery life
+  if(buttonStateShort == HIGH)
   {
-    send_payload[BATTERY] = (char) vcc.Read_Perc(VccMin, VccMax);
-    sendData();
-    sleepCounter = 0;
-    delay(50);
+    showBattery();
+  }
+  // If button is pressed for long duraion, then disable alarm (don't send data)
+  else if(buttonStateLong == HIGH)
+  {
+    disableAlarm = true;
+    alarmDisableCounter = 2;    // Wait for 2x8=16 sec
   }
   else
-  {
-    LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+  { // If switch is not pressed, then only continue sleeping
+    if(sleepCounter > sleepDuration)
+    {
+      send_payload[BATTERY] = (char) vcc.Read_Perc(VccMin, VccMax);
+      sendData();
+      sleepCounter = 0;
+      delay(50);
+    }
+    else
+    {
+      LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+    }
+    sleepCounter++;
   }
-  sleepCounter++;
 }
