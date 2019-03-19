@@ -1,7 +1,5 @@
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>0                                                                              
-#include <Servo.h>
-#include <CapacitiveSensor.h>
+#include <PubSubClient.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
@@ -16,52 +14,38 @@ const char* password          = "P@ssLakeView";
 const char* mqtt_server       = "192.168.2.12";
 const char* mqtt_uname        = "onkar20";
 const char* mqtt_pass         = "onkar20";
-const char* mqtt_device_name  = "ESP8266KitchenSwitch";
-const char* ota_device_name   = "OTA_Kitchen_Switch";
+const char* mqtt_device_name  = "ESP8266ComputerSwitch";
+const char* ota_device_name   = "OTA_Computer_Switch";
 const char* ota_password      = "onkar20";
 
 //-------------variable declaration
-const int servo     = 4;
-const int lightPin  = 2;
-const int switchPin = 14;
-const int posOn     = 150;
-const int posOff    = 45;
-const int posNormal = 100;
+const int relay     = 12;
+const int ledPin    = 13;
+const int switchPin = 0;
 int switchStatus    = 0;
-int lightIntensity  = 0;
-int counter         = 0;
-
-const int DHTPIN    = 12;
-const int LDRPIN    = A0;
-const int RFPIN     = 5;
-bool  flag          = false;
-bool motionFlag     = false;
-#define DHTTYPE     DHT11     // DHT 11
+bool firstTime      = true;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
-DHT dht(DHTPIN, DHTTYPE);
-Servo s1;
-//CapacitiveSensor capSensor = CapacitiveSensor(capSend, capReceive);
-
 //----------------------------------------------------------------------------------
 void setup() {
-  s1.attach(servo);
-  s1.write(posOff);
-  s1.detach();
-  dht.begin();
-  pinMode(lightPin, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  pinMode(relay, OUTPUT);
+  digitalWrite(relay, HIGH);
+  pinMode(ledPin, OUTPUT);
   pinMode(switchPin, INPUT);
-  pinMode(LDRPIN,   INPUT);
-  pinMode(RFPIN,    INPUT);
-  pinMode(DHTPIN,   INPUT);
-  
+
   Serial.begin(115200);
   setup_wifi();
   setup_OTA();
   
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
+  reconnect();
+  client.publish("home/computerSwitch/command", "1");
+  client.publish("home/computerSwitch/state", "1");
+  
+  digitalWrite(ledPin, HIGH);
+  digitalWrite(switchPin, HIGH);
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -111,15 +95,16 @@ void setup_wifi() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    digitalWrite(lightPin, !digitalRead(lightPin));
+    digitalWrite(ledPin, !digitalRead(ledPin));
   }
 
-  digitalWrite(lightPin, HIGH);
+  digitalWrite(ledPin, HIGH);
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 }
+
 //----------------------------------------------------------------------------------------------------
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived new [");
@@ -130,40 +115,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println();
 
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    blinkLED(2);
-    switchStatus = 1;              //update local switch status with MQTT
-    runServo(posOn);
-    client.publish("home/kitchenSwitch/state", "1");
-    //sleep_timer = 4;
+  if(!firstTime)
+  {
+    // Switch on the LED if an 1 was received as first character
+    if ((char)payload[0] == '1') {
+      blinkLED(2);
+      switchStatus = 1;              //update local switch status with MQTT
+      digitalWrite(relay, HIGH);
+      client.publish("home/computerSwitch/state", "1");
+    }
+    else {
+      blinkLED(1);
+      switchStatus = 0;              //update local switch status with MQTT
+      digitalWrite(relay, LOW);
+      client.publish("home/computerSwitch/state", "0");
+    }
   }
-  else {
-    blinkLED(1);
-    switchStatus = 0;              //update local switch status with MQTT
-    runServo(posOff);
-    client.publish("home/kitchenSwitch/state", "0");
-    //sleep_timer = 2;
-  }
+  firstTime = false;
 }
-//---------------------------------------------------------------------------------------------------
-void runServo(int servoPos) {
-  s1.attach(servo);
-  s1.write(servoPos);
-  delay(500);
-  s1.write(posNormal);
-  delay(500);
-  s1.detach();
-}
+
 //---------------------------------------------------------------------------------------------------
 void blinkLED (int noOfTimes) {
   for(int i=0; i< noOfTimes; i++) {
-    digitalWrite(lightPin, LOW);
+    digitalWrite(ledPin, LOW);
     delay(100);
-    digitalWrite(lightPin, HIGH);
+    digitalWrite(ledPin, HIGH);
     delay(100);
   }
 }
+
 //----------------------------------------------------------------------------------------------------
 void reconnect() {
   // Loop until we're reconnected
@@ -172,7 +152,7 @@ void reconnect() {
     // Attempt to connect
     if (client.connect(mqtt_device_name, mqtt_uname, mqtt_pass)) {
       Serial.println("connected");
-      client.subscribe("home/kitchenSwitch/command");
+      client.subscribe("home/computerSwitch/command");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -183,79 +163,12 @@ void reconnect() {
   }
 }
 
-//----------------------------------------------------------------------------------------------------
-void readTemperature()
-{
-  float newTempValue = dht.readTemperature(true); //to use celsius remove the true text inside the parentheses  
-  float newHumValue = dht.readHumidity();
 
-  Serial.print("Temperature: ");
-    Serial.print(newTempValue);
-    Serial.println(" *F");
-    client.publish("home/kitchen/temperature", String(newTempValue).c_str());
-
-  Serial.print("Humidity: ");
-    Serial.print(newHumValue);
-    Serial.println("%");
-    client.publish("home/kitchen/humidity", String(newHumValue).c_str());
-}
-
-//----------------------------------------------------------------------------------------------------
-void readLight(){
-  int newLDR = analogRead(LDRPIN);
-
-  //lightIntensity = lightIntensity + 0.25*(newLDR - lightIntensity);
-  Serial.print("light intensity: ");
-  //Serial.println(lightIntensity);
-  //client.publish("home/kitchen/light", String(lightIntensity).c_str());
-  Serial.println(newLDR);
-  client.publish("home/kitchen/light", String(newLDR).c_str());
-}
-
-//----------------------------------------------------------------------------------------------------
-void checkMotion(){
-  if(digitalRead(RFPIN))
-  {
-    if(motionFlag == false)
-    {
-      Serial.println("motion detected");
-      motionFlag = true;
-      client.publish("home/kitchen/rfmotion", "1");
-    }
-  }
-  else
-  {
-    if(motionFlag == true)
-    {
-      Serial.println("no motion");
-      motionFlag = false;
-      client.publish("home/kitchen/rfmotion", "0");
-    }
-  }
-}
 //----------------------------------------------------------------------------------------------------
 void loop() {
   ArduinoOTA.handle();
-  
   if (!client.connected()) {
     reconnect();
-  }
-  
-  //scheduler
-  counter++;
-  if(counter%40 == 0)
-  {
-    readTemperature();
-  }
-
-  if(counter%10 == 0)
-  {
-    readLight();
-  }
-
-  if(counter > 99)
-  {
-    counter = 0;
   }
 
   if (0 == digitalRead(switchPin))
@@ -265,19 +178,17 @@ void loop() {
     if (switchStatus)
     {
       blinkLED(2);
-      client.publish("home/kitchenSwitch/state", "1");
-      runServo(posOn);
+      client.publish("home/computerSwitch/state", "1");
+      digitalWrite(relay, HIGH);
     }
     else
     {
       blinkLED(1);
-      client.publish("home/kitchenSwitch/state", "0");
-      runServo(posOff);
+      client.publish("home/computerSwitch/state", "0");
+      digitalWrite(relay, LOW);
     }
   }
-  
-  checkMotion();
-  
+ 
   delay(500);
   client.loop();
 }
