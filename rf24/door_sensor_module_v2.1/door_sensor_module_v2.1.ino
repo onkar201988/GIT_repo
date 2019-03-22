@@ -160,7 +160,7 @@ ISR(WDT_vect)
   if(disableAlarm == true)          // Alarm was disables by long switch press
   {
     #ifdef debug
-      Serial.println("In WDT ISR, after long swict press");
+      Serial.println("In WDT ISR, after long switch press");
     #endif
     if(alarmDisableCounter > 0)     // wait for 16 sec, and then enable alarm
     {
