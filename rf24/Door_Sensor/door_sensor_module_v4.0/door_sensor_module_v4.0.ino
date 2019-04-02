@@ -5,7 +5,7 @@
 #include <Vcc.h>
 #include <avr/wdt.h>
 
-//#define debug                               // comment this to remove serial prints
+#define debug                               // comment this to remove serial prints
 //----------------------------------------------------------------------------------------------------
 const uint64_t pipeAddress = 0xB00B1E50C3LL;// Create pipe address for the network, "LL" is for LongLong type
 const uint8_t rfChannel = 89;               // Set channel frequency default (chan 84 is 2.484GHz to 2.489GHz)
@@ -38,6 +38,8 @@ volatile byte buttonStateShort = LOW;       // Final button state for short pres
 volatile byte buttonStateLong = LOW;        // Final button state for long press
 volatile unsigned long buttonHighTime;      // Internal time variable to store start of high time
 volatile unsigned long buttonLowTime;       // Internal time varible to store start of low time
+
+volatile bool magnetSwitchStatus = false;   // Magnet switch status will be set in ISR, and analyzed in loop
 //----------------------------------------------------------------------------------------------------
 const int SENSORTYPE  = 0;
 const int DOORNUMBER  = 1;
@@ -99,42 +101,17 @@ void setup() {
 //----------------------------------------------------------------------------------------------------
 void magnetSwitch_ISR()
 {
-  noInterrupts();
-  detachInterrupt(digitalPinToInterrupt(hallSensor_pin));
-  
-  #ifdef debug
-    Serial.println("In Reed switch ISR");
-  #endif
-  
-  doorStatus = digitalRead(hallSensor_pin);
-  
-  #ifdef debug
-    Serial.println(doorStatus);
-  #endif
-
-  if(disableAlarm == false) // only update the status when alarm is allowed
+  if( magnetSwitchStatus == false)
   {
-    send_payload[DOORSTATUS]  = doorStatus ? 'O':'C';
-    sendData();
+    magnetSwitchStatus = true;
   }
-  else
-  {
-    if(doorStatus == HIGH)      // if door is opened during alarm disable, then eneble alarm
-    {
-      disableAlarm = false;     // eneble alarm, so that when door is closed, the data will be sent
-      alarmDisableCounter = 0;  // reset disable counter
-    }
-  }
-
-  attachInterrupt(digitalPinToInterrupt(hallSensor_pin), magnetSwitch_ISR, CHANGE);
-  interrupts();
 }
 
 //----------------------------------------------------------------------------------------------------
 void buttonSwitch_ISR()
 {
-  noInterrupts();
-  detachInterrupt(digitalPinToInterrupt(button_pin));
+  //noInterrupts();
+  //detachInterrupt(digitalPinToInterrupt(button_pin));
   
   #ifdef debug
     Serial.println("In button switch ISR");
@@ -161,8 +138,8 @@ void buttonSwitch_ISR()
     }
   }
 
-  attachInterrupt(digitalPinToInterrupt(button_pin), buttonSwitch_ISR, CHANGE);
-  interrupts();
+  //attachInterrupt(digitalPinToInterrupt(button_pin), buttonSwitch_ISR, CHANGE);
+  //interrupts();
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -245,34 +222,80 @@ void sendData()
 //----------------------------------------------------------------------------------------------------
 void loop()
 {
-  // If Button is pressed for short duration, then show battery life
-  if(buttonStateShort == HIGH)
+  if(magnetSwitchStatus == true)
   {
+    noInterrupts();
+        
+    #ifdef debug
+      Serial.println("In Reed switch ISR");
+      yield();
+    #endif
+
+    doorStatus = digitalRead(hallSensor_pin);
+
+    #ifdef debug
+      Serial.println(doorStatus);
+      yield();
+    #endif
+
+    if(disableAlarm == false) // only update the status when alarm is allowed
+    {
+      send_payload[DOORSTATUS]  = doorStatus ? 'O':'C';
+      sendData();
+    }
+    else
+    {
+      if(doorStatus == HIGH)      // if door is opened during alarm disable, then eneble alarm
+      {
+        disableAlarm = false;     // eneble alarm, so that when door is closed, the data will be sent
+        alarmDisableCounter = 0;  // reset disable counter
+      }
+    }
+
+    interrupts();
+    magnetSwitchStatus = false;
+  }
+  // If Button is pressed for short duration, then show battery life
+  else if(buttonStateShort == HIGH)
+  {
+    noInterrupts();
     #ifdef debug
       Serial.println("Short press detected...");
+      yield();
     #endif
     //showBattery();
     blinkLED(0, 100, 0, 1000);
     buttonStateShort = LOW;
+    interrupts();
   }
   // If button is pressed for long duraion, then disable alarm (don't send data)
   else if(buttonStateLong == HIGH)
   {
+    noInterrupts();
     #ifdef debug
       Serial.println("Long press detected...");
+      yield();
     #endif
     blinkLED(0, 0, 100, 1000);
     disableAlarm = true;
     alarmDisableCounter = alarmDisableTime;    // Wait for 2x8=16 sec
     buttonStateLong = LOW;
+    interrupts();
   }
   else if(buttonState == LOW)
   { // If switch is not pressed, then only continue sleeping
     #ifdef debug
       Serial.println("No button press, going to sleep again..");
+      delay(200);
+      yield();
     #endif
     if((sleepCounter > sleepDuration) && disableAlarm == false )
     {
+      #ifdef debug
+      Serial.println("Sending battery status...");
+      delay(200);
+      yield();
+    #endif
       delay(200);
       send_payload[BATTERY] = (char) vcc.Read_Perc(VccMin, VccMax);
       sendData();
@@ -281,7 +304,7 @@ void loop()
     }
     else
     {
-      LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+      LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);  
     }
     sleepCounter++;
   }
