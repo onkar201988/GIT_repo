@@ -21,20 +21,25 @@ const char* mqtt_command      = "home/kitchenSwitch/command";
 const char* mqtt_state        = "home/kitchenSwitch/state";
 
 //-------------variable declaration
-const int relay     = 12;
-const int ledPin    = 13;
-const int switchPin = 0;
-int switchStatus    = 0;
-bool firstTime      = true;
+const int relay      = 12;
+const int ledPin     = 13;
+const int switchPin  = 4;
+bool switchStatusMqtt = false;
+bool swithStatusSw    = false;
+bool firstTime       = true;
+bool previousSw      = LOW;
+bool swChanged       = false;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 //----------------------------------------------------------------------------------
 void setup() {
   pinMode(relay, OUTPUT);
-  digitalWrite(relay, HIGH);
   pinMode(ledPin, OUTPUT);
   pinMode(switchPin, INPUT);
+
+  previousSw = digitalRead(switchPin);
+  digitalWrite(relay, !previousSw);
 
   Serial.begin(115200);
   setup_wifi();
@@ -122,13 +127,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
     // Switch on the LED if an 1 was received as first character
     if ((char)payload[0] == '1') {
       blinkLED(2);
-      switchStatus = 1;              //update local switch status with MQTT
+      switchStatusMqtt = true;              //update local switch status with MQTT
       digitalWrite(relay, HIGH);
       client.publish(mqtt_state, "1");
     }
     else {
       blinkLED(1);
-      switchStatus = 0;              //update local switch status with MQTT
+      switchStatusMqtt = false;              //update local switch status with MQTT
       digitalWrite(relay, LOW);
       client.publish(mqtt_state, "0");
     }
@@ -173,11 +178,18 @@ void loop() {
     reconnect();
   }
 
-  if (0 == digitalRead(switchPin))
+  if (previousSw != digitalRead(switchPin))
   {
-    switchStatus = !switchStatus;
-    Serial.println("switch pressed");
-    if (switchStatus)
+    swithStatusSw = digitalRead(switchPin);
+    previousSw = swithStatusSw;
+    swChanged = true;
+    Serial.println("switch changed");
+  }
+  
+  if(swChanged)
+  {
+    Serial.println("If condition switch changed");
+    if (!swithStatusSw)
     {
       blinkLED(2);
       client.publish(mqtt_state, "1");
@@ -189,6 +201,7 @@ void loop() {
       client.publish(mqtt_state, "0");
       digitalWrite(relay, LOW);
     }
+    swChanged = false;
   }
  
   delay(500);

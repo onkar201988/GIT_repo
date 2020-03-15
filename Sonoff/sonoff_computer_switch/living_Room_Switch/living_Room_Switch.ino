@@ -14,11 +14,11 @@ const char* password          = "P@ssLakeView";
 const char* mqtt_server       = "192.168.2.12";
 const char* mqtt_uname        = "onkar20";
 const char* mqtt_pass         = "onkar20";
-const char* mqtt_device_name  = "ESP8266kitchenSwitch";
-const char* ota_device_name   = "OTA_kitchenSwitch_Switch";
+const char* mqtt_device_name  = "ESP8266LivingRoomSwitch";
+const char* ota_device_name   = "OTA_livingRoom_Switch";
 const char* ota_password      = "onkar20";
-const char* mqtt_command      = "home/kitchenSwitch/command";
-const char* mqtt_state        = "home/kitchenSwitch/state";
+const char* mqtt_command      = "home/livingRoomSwitch/command";
+const char* mqtt_state        = "home/livingRoomSwitch/state";
 
 //-------------variable declaration
 const int relay     = 12;
@@ -32,7 +32,8 @@ PubSubClient client(espClient);
 //----------------------------------------------------------------------------------
 void setup() {
   pinMode(relay, OUTPUT);
-  digitalWrite(relay, HIGH);
+  //digitalWrite(relay, HIGH);
+  digitalWrite(relay, LOW);
   pinMode(ledPin, OUTPUT);
   pinMode(switchPin, INPUT);
 
@@ -43,8 +44,8 @@ void setup() {
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
   reconnect();
-  client.publish(mqtt_command, "1");
-  client.publish(mqtt_state, "1");
+  //client.publish(mqtt_command, "1");
+  //client.publish(mqtt_state, "1");
   
   digitalWrite(ledPin, HIGH);
   digitalWrite(switchPin, HIGH);
